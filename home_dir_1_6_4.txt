@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# Declare empty arrays for users and hosts
+users=()
+hosts=()
+
+today=`date +%Y%m%d`
+
+# Read the file line by line
+while IFS=" " read -r user host; do
+    users+=("$user")   # Append user to the users array
+    hosts+=("$host")   # Append host to the hosts array
+done < "user_host_list.txt"
+
+local_key_file=/tmp/CR13579/all_public_keys.txt
+
+#Remove exisitng key file.
+rm -rf /tmp/CR13579/all_public_keys.txt
+
+#Create the key file
+touch /tmp/CR13579/all_public_keys.txt
+
+create_keyfile() {
+    # Loop through the arrays and get home directories
+    for i in "${!hosts[@]}"; do
+        host="${hosts[$i]}"
+        user="${users[$i]}"
+
+        echo "================= $host ================="
+
+        # Get the home directory of the user on the remote host
+        home_dir=$(ssh "$host" "getent passwd $user | cut -d: -f6")
+
+        # Check if the home directory exists
+        if ssh "$host" "[ -d $home_dir ]"; then
+            echo "Home directory for $user exists on $host: $home_dir"
+        else
+            echo "Home directory for $user does not exist on $host. Creating it..."
+            ssh "$host" "mkdir -p $home_dir && chown $user:$user $home_dir && chmod 700 $home_dir"
+        fi
+
+        keypath="$home_dir/.ssh/id_rsa.pub"  # Path to the public key
+
+        # Check if the SSH public key exists
+        ssh "$host" "if [ ! -f $home_dir/.ssh/id_rsa ]; then
+            echo '========== Generating SSH Key ==========';
+            sudo -u $user bash -c '
+                mkdir -p ~/.ssh && chmod 700 ~/.ssh;
+                ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N \"\";
+                echo "✅ SSH key successfully generated for $user on $host."
+            '
+        else
+            echo 'SSH key already exists, skipping generation.';
+        fi"
+      done
+}
+
+
+copy_keyfile() {
+for i in "${!hosts[@]}"; do
+    host="${hosts[$i]}"
+    user="${users[$i]}"
+
+    echo "====   Copying key files from $user@$host to jump host $local_key_file ===="
+    # Get the home directory of the user on the remote host
+    home_dir=$(ssh "$host" "getent passwd $user | cut -d: -f6")
+    keypath="$home_dir/.ssh/id_rsa.pub"  # Path to the public key
+
+     # Append the key content to the local file
+     ssh "$host" "cat $keypath" >> /tmp/CR13579/all_public_keys.txt
+
+done
+}
+
+paste_keyfile() {
+# Declare empty arrays for users and hosts
+users=()
+hosts=()
+
+# Read the file line by line
+while IFS=" " read -r user host; do
+    users+=("$user")   # Append user to the users array
+    hosts+=("$host")   # Append host to the hosts array
+done < "/tmp/CR13579/dest_server"
+
+# Loop through the arrays and copy the key file to the destination servers
+for i in "${!hosts[@]}"; do
+    host="${hosts[$i]}"
+    user="${users[$i]}"
+
+    echo "================= Public key from $local_key_file copied and appended to $user@$host:$home_dir/.ssh/authorized_keys  ================="
+    # Get the home directory of the user on the remote host
+    home_dir=$(ssh "$host" "getent passwd $user | cut -d: -f6")
+    keypath="$home_dir/.ssh/id_rsa.pub"  # Path to the public key
+    #users=$(ssh "$host" "getent passwd $user | cut -d: -f5")
+
+    # Check if the home directory exists
+    if ssh "$host" "[ -d $home_dir ]"; then
+        echo "Home directory for $user exists on $host: $home_dir"
+    else
+        echo "Home directory for $user does not exist on $host. Creating it..."
+        ssh "$host" "mkdir -p $home_dir && chmod 700 $home_dir && chown $user:$user $home_dir"
+    fi
+
+    # Ensure the remote .ssh directory exists
+    ssh "$host" "mkdir -p $home_dir/.ssh && chown $user:$user $home_dir/.ssh && chmod 700 $home_dir/.ssh"
+
+    # Copy the local key file content to the remote server and append to authorized_keys
+    scp "$local_key_file" "$host:/tmp/all_public_keys.txt" # Copy the key file temporarily to the remote server
+
+    # Taking a backing of authorized_key file
+    ssh "$host" "cp -p $home_dir/.ssh/authorized_keys $home_dir/.ssh/authorized_keys_$today"
+
+    # Append the public key to the authorized_keys file (ensure correct permissions)
+    ssh "$host" "cat /tmp/all_public_keys.txt >> $home_dir/.ssh/authorized_keys && chown $user:$user $home_dir/.ssh/authorized_keys && chmod 600 $home_dir/.ssh/authorized_keys && rm -rf /tmp/all_public_keys.txt"
+
+    # Inform the user that the key has been copied and appended
+    echo "Public key from $local_key_file copied and appended to $user@$host:$home_dir/.ssh/authorized_keys"
+done
+}
+
+create_keyfile
+copy_keyfile
+paste_keyfile
+
+# invoke the host key verfication script.
+sh process_ssh.sh

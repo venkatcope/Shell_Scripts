@@ -1,0 +1,8 @@
+[root@centos8 script]# cat create_ssh
+#!/bin/bash
+
+read -p "Enter the CR Number :" CRN
+mkdir -p /tmp/$CRN
+cp -p home_dir_1_6_2.sh user_host_list.txt dest_server process_ssh.sh auto_ssh_hostkey.exp /tmp/$CRN
+echo $CRN
+sed -i "s/CR/$CRN/g" /tmp/$CRN/home_dir_1_6_2.sh

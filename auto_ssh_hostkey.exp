@@ -1,0 +1,41 @@
+#!/usr/bin/expect -f
+
+# Arguments: source_user, source_host, dest_user, dest_host
+set timeout 1
+set source_user [lindex $argv 0]
+set source_host [lindex $argv 1]
+set dest_user [lindex $argv 2]
+set dest_host [lindex $argv 3]
+
+# Set passwords for the source and destination (you can modify this to read from a file securely)
+#set source_password "source_password_here"
+#set dest_password "dest_password_here"
+
+# Log in to the source server
+spawn ssh $source_host
+expect "*#"
+send "su - $source_user\r"
+expect "*$"
+
+# Log in to the destination server from the source server
+#expect "*$source_user@*"
+send "ssh $dest_user@$dest_host\r"
+
+expect {
+    "yes/no" {
+        send "yes\r"
+        exp_continue
+    }
+    timeout {
+        send_user "Connection to $dest_host timed out. Exiting...\n"
+        exit 1
+    }
+    eof {
+        send_user "Error connecting to $dest_host. Exiting...\n"
+        exit 1
+    }
+  exit 1
+}
+exit 1
+# End the session
+expect eof
