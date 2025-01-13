@@ -12,13 +12,13 @@ while IFS=" " read -r user host; do
     hosts+=("$host")   # Append host to the hosts array
 done < "user_host_list.txt"
 
-local_key_file=/tmp/CR13579/all_public_keys.txt
+local_key_file=/tmp/CR/all_public_keys.txt
 
 #Remove exisitng key file.
-rm -rf /tmp/CR13579/all_public_keys.txt
+rm -rf /tmp/CR/all_public_keys.txt
 
 #Create the key file
-touch /tmp/CR13579/all_public_keys.txt
+touch /tmp/CR/all_public_keys.txt
 
 create_keyfile() {
     # Loop through the arrays and get home directories
@@ -67,7 +67,7 @@ for i in "${!hosts[@]}"; do
     keypath="$home_dir/.ssh/id_rsa.pub"  # Path to the public key
 
      # Append the key content to the local file
-     ssh "$host" "cat $keypath" >> /tmp/CR13579/all_public_keys.txt
+     ssh "$host" "cat $keypath" >> /tmp/CR/all_public_keys.txt
 
 done
 }
@@ -81,7 +81,7 @@ hosts=()
 while IFS=" " read -r user host; do
     users+=("$user")   # Append user to the users array
     hosts+=("$host")   # Append host to the hosts array
-done < "/tmp/CR13579/dest_server"
+done < "/tmp/CR/dest_server"
 
 # Loop through the arrays and copy the key file to the destination servers
 for i in "${!hosts[@]}"; do
